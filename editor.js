@@ -13,6 +13,7 @@ export class Editor {
     this.panStart = null;
     this.currentPolyline = null;
     this.currentCircle = null;
+    this.currentEraser = null;
 
     this.view = {
       offsetX: 0,
@@ -216,3 +217,4 @@ export class Editor {
     this.view.scale = newScale;
   }
 }
+
