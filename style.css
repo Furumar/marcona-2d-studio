@@ -63,3 +63,60 @@ body {
   border-radius: 4px;
   overflow: auto;
 }
+
+/* === MARCONA Command Architecture v1 === */
+
+/* Kelluva komentopaneeli */
+#cmd-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 20, 20, 0.85);
+  padding: 8px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  display: none; /* näkyy vasta kun aktivoidaan */
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 9999;
+  width: 260px;
+  cursor: default;
+}
+
+/* Paneelin otsikko (drag-alue) */
+#cmd-panel-header {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 4px;
+  cursor: move;
+  user-select: none;
+}
+
+/* Komentokenttä */
+#cmd-input {
+  width: 100%;
+  background: #222;
+  color: #eee;
+  border: 1px solid #555;
+  padding: 6px;
+  font-family: monospace;
+  border-radius: 4px;
+}
+
+/* Näkyvä tila */
+#cmd-panel.visible {
+  display: block;
+  opacity: 1;
+}
+
+/* Pyyhekumi-ikoni modernilla flat-tyylillä */
+button[data-tool="eraser"] {
+  font-size: 1.1rem;
+  filter: brightness(1.2);
+}
+button[data-tool="eraser"].active {
+  background: #d9534f;
+  border-color: #d9534f;
+}
