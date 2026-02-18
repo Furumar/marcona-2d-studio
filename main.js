@@ -79,4 +79,7 @@ btnRedo.addEventListener("click", () => {
 });
 
 btnSave.addEventListener("click", () => {
-  saveScene(editor.sh
+  saveScene(editor.shapes);
+});
+
+
