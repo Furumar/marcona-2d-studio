@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <title>MARCONA 2D Studio</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="app">
+
+      <!-- Toolbar -->
+      <header class="toolbar">
+        <button data-tool="select">Valitse</button>
+        <button data-tool="pan">Panoroi</button>
+        <button data-tool="line">Viiva</button>
+        <button data-tool="polyline">Polylinja</button>
+        <button data-tool="circle">Ympyrä</button>
+        <button data-tool="eraser" title="Pyyhekumi">🧽</button>
+        <button id="btn-undo">Undo</button>
+        <button id="btn-redo">Redo</button>
+      </header>
+
+      <!-- Main area -->
+      <div class="main">
+        <div class="canvas-wrapper">
+          <canvas id="viewport"></canvas>
+          <canvas id="snap-overlay"></canvas>
+        </div>
+
+        <aside class="sidebar">
+          <h3>Valinta</h3>
+          <pre id="selection-info">Ei valintaa</pre>
+        </aside>
+      </div>
+    </div>
+
+    <!-- Kelluva komentopaneeli -->
+    <div id="cmd-panel">
+      <div id="cmd-panel-header">Command</div>
+      <input id="cmd-input" placeholder="Kirjoita komento tai koordinaatti…" autocomplete="off" />
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
+
+//C:\Users\marco\MARCONA\MARCONA 2D\index.html 18.2.2025 klo 13:21

@@ -1,0 +1,173 @@
+//C:\Users\marco\MARCONA\MARCONA 2D\style.css 18.2.2025 klo 13:21
+/* === GLOBAL === */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* === TOOLBAR === */
+
+.toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: #1b1b1b;
+  border-bottom: 1px solid #333;
+}
+
+.toolbar button {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.toolbar button:hover {
+  background: #2d2d2d;
+}
+
+.toolbar button.active {
+  background: #337ab7;
+  border-color: #337ab7;
+}
+
+/* Pyyhekumi modernilla flat-tyylillä */
+button[data-tool="eraser"] {
+  font-size: 1.1rem;
+  filter: brightness(1.2);
+}
+button[data-tool="eraser"].active {
+  background: #d9534f;
+  border-color: #d9534f;
+}
+
+/* === MAIN LAYOUT === */
+
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 240px;
+  border-left: 1px solid #333;
+  background: #151515;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.sidebar h3 {
+  margin-top: 0;
+}
+
+/* === CANVAS AREA === */
+
+.canvas-wrapper {
+  position: relative;
+  flex: 1;
+  background: #181818;
+  overflow: hidden;
+}
+
+#viewport,
+#snap-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* snap-overlay on aina päällä, mutta läpinäkyvä */
+#snap-overlay {
+  pointer-events: none;
+}
+
+/* === COMMAND PANEL === */
+
+#cmd-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 20, 20, 0.9);
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  display: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 9999;
+  width: 280px;
+  cursor: default;
+}
+
+#cmd-panel.visible {
+  display: block;
+  opacity: 1;
+}
+
+#cmd-panel-header {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 6px;
+  cursor: move;
+  user-select: none;
+}
+
+#cmd-input {
+  width: 100%;
+  background: #222;
+  color: #eee;
+  border: 1px solid #555;
+  padding: 6px;
+  font-family: monospace;
+  border-radius: 4px;
+}
+
+/* === SNAP VISUALS === */
+
+/* Snap-symbolit piirretään canvasilla, mutta tämä varmistaa että ne näkyvät terävinä */
+.snap-point {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: yellow;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* === POLYLINE PREVIEW === */
+
+.preview-line {
+  stroke: #888;
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+}
+
+/* === SCROLLBARS (piilotetaan CAD-tyyliin) === */
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
