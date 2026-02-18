@@ -1,6 +1,6 @@
 // FILE: editor.js
 
-import { Line, Polyline, hitTestShape } from "./geometry.js";
+import { Line, Polyline, Circle, hitTestShape } from "./geometry.js";
 
 let nextId = 1;
 
@@ -11,12 +11,15 @@ export class Editor {
     this.selection = null;
     this.dragStart = null;
     this.panStart = null;
+    this.currentPolyline = null;
+    this.currentCircle = null;
+
     this.view = {
       offsetX: 0,
       offsetY: 0,
       scale: 1,
     };
-    this.currentPolyline = null;
+
     this.undoStack = [];
     this.redoStack = [];
   }
@@ -24,6 +27,7 @@ export class Editor {
   setTool(tool) {
     this.tool = tool;
     this.currentPolyline = null;
+    this.currentCircle = null;
   }
 
   setShapes(shapes) {
@@ -31,12 +35,9 @@ export class Editor {
   }
 
   factoryFromJSON(o) {
-    if (o.type === "line") {
-      return new Line(o.id, o.x1, o.y1, o.x2, o.y2);
-    }
-    if (o.type === "polyline") {
-      return new Polyline(o.id, o.points);
-    }
+    if (o.type === "line") return new Line(o.id, o.x1, o.y1, o.x2, o.y2);
+    if (o.type === "polyline") return new Polyline(o.id, o.points);
+    if (o.type === "circle") return new Circle(o.id, o.cx, o.cy, o.r);
     return null;
   }
 
@@ -68,14 +69,6 @@ export class Editor {
     return { x, y };
   }
 
-  screenFromWorld(x, y, canvas) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: rect.left + this.view.offsetX + x * this.view.scale,
-      y: rect.top + this.view.offsetY + y * this.view.scale,
-    };
-  }
-
   onMouseDown(e, canvas) {
     const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
 
@@ -85,7 +78,7 @@ export class Editor {
     }
 
     if (this.tool === "select") {
-      this.selection = this.pickShape(x, y, canvas);
+      this.selection = this.pickShape(x, y);
       if (this.selection) {
         this.dragStart = {
           sx: e.clientX,
@@ -116,9 +109,18 @@ export class Editor {
       this.selection = { shape: this.currentPolyline };
       return;
     }
+
+    if (this.tool === "circle") {
+      this.pushUndo();
+      this.currentCircle = new Circle(nextId++, x, y, 0);
+      this.shapes.push(this.currentCircle);
+      return;
+    }
   }
 
   onMouseMove(e, canvas) {
+    const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
+
     if (this.tool === "pan" && this.panStart) {
       const dx = e.clientX - this.panStart.sx;
       const dy = e.clientY - this.panStart.sy;
@@ -128,7 +130,6 @@ export class Editor {
     }
 
     if (this.tool === "select" && this.dragStart && this.selection) {
-      const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
       const { x: x0, y: y0 } = this.worldFromScreen(this.dragStart.sx, this.dragStart.sy, canvas);
       const dx = x - x0;
       const dy = y - y0;
@@ -136,10 +137,16 @@ export class Editor {
       return;
     }
 
-    if (this.tool === "line" && this.selection && this.selection.shape.type === "line") {
-      const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
+    if (this.tool === "line" && this.selection?.shape.type === "line") {
       this.selection.shape.x2 = x;
       this.selection.shape.y2 = y;
+      return;
+    }
+
+    if (this.tool === "circle" && this.currentCircle) {
+      const dx = x - this.currentCircle.cx;
+      const dy = y - this.currentCircle.cy;
+      this.currentCircle.r = Math.hypot(dx, dy);
       return;
     }
   }
@@ -147,6 +154,7 @@ export class Editor {
   onMouseUp() {
     this.dragStart = null;
     this.panStart = null;
+    this.currentCircle = null;
   }
 
   onDoubleClick(e, canvas) {
@@ -168,10 +176,13 @@ export class Editor {
         shape.points[i] = orig.points[i] + dx;
         shape.points[i + 1] = orig.points[i + 1] + dy;
       }
+    } else if (shape.type === "circle") {
+      shape.cx = orig.cx + dx;
+      shape.cy = orig.cy + dy;
     }
   }
 
-  pickShape(x, y, canvas) {
+  pickShape(x, y) {
     for (let i = this.shapes.length - 1; i >= 0; i--) {
       const s = this.shapes[i];
       if (hitTestShape(s, x, y, 5 / this.view.scale)) {
