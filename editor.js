@@ -1,46 +1,137 @@
 /* FILE: C:\Users\marco\MARCONA\MARCONA 2D\editor.js — 2026-02-18 09:50 */
 
-import { Line, Polyline, Circle, hitTestShape } from "./geometry.js";
+export class Line {
+  constructor(points, color = "#ffffff") {
+    this.points = points; // [ {x,y}, {x,y} ]
+    this.color = color;
+  }
 
-let nextId = 1;
+  draw(ctx, highlight = false) {
+    if (this.points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(this.points[0].x, this.points[0].y);
+    ctx.lineTo(this.points[1].x, this.points[1].y);
+    ctx.strokeStyle = highlight ? "yellow" : this.color;
+    ctx.lineWidth = highlight ? 2 : 1;
+    ctx.stroke();
+  }
+
+  hitTest(x, y, tol = 5) {
+    const [p1, p2] = this.points;
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return false;
+    const t = ((x - p1.x) * dx + (y - p1.y) * dy) / len2;
+    if (t < 0 || t > 1) return false;
+    const px = p1.x + t * dx;
+    const py = p1.y + t * dy;
+    const dist = Math.hypot(x - px, y - py);
+    return dist <= tol;
+  }
+}
+
+export class Polyline {
+  constructor(points, color = "#ffffff") {
+    this.points = points; // array of {x,y}
+    this.color = color;
+  }
+
+  draw(ctx, highlight = false) {
+    if (this.points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(this.points[0].x, this.points[0].y);
+    for (let i = 1; i < this.points.length; i++) {
+      ctx.lineTo(this.points[i].x, this.points[i].y);
+    }
+    ctx.strokeStyle = highlight ? "yellow" : this.color;
+    ctx.lineWidth = highlight ? 2 : 1;
+    ctx.stroke();
+  }
+
+  hitTest(x, y, tol = 5) {
+    for (let i = 0; i < this.points.length - 1; i++) {
+      const seg = new Line([this.points[i], this.points[i + 1]], this.color);
+      if (seg.hitTest(x, y, tol)) return true;
+    }
+    return false;
+  }
+}
+
+export class Circle {
+  constructor(center, radius, color = "#ffffff") {
+    this.center = center;
+    this.radius = radius;
+    this.color = color;
+  }
+
+  draw(ctx, highlight = false) {
+    ctx.beginPath();
+    ctx.arc(this.center.x, this.center.y, this.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = highlight ? "yellow" : this.color;
+    ctx.lineWidth = highlight ? 2 : 1;
+    ctx.stroke();
+  }
+
+  hitTest(x, y, tol = 5) {
+    const d = Math.hypot(x - this.center.x, y - this.center.y);
+    return Math.abs(d - this.radius) <= tol;
+  }
+}
 
 export class Editor {
-  constructor() {
-    this.shapes = [];
-    this.tool = "select";
-    this.selection = null;
-    this.dragStart = null;
-    this.panStart = null;
-    this.currentPolyline = null;
-    this.currentCircle = null;
-    this.currentEraser = null;
+  constructor(canvas, selectionInfoEl) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.selectionInfoEl = selectionInfoEl;
 
-    this.view = {
-      offsetX: 0,
-      offsetY: 0,
-      scale: 1,
-    };
+    this.shapes = [];
+    this.selection = null;
+    this.tool = "select";
+    this.isPanning = false;
+    this.panStart = null;
+    this.offset = { x: 0, y: 0 };
+
+    this.isDrawing = false;
+    this.currentPolyline = null;
+    this.lastPoint = null;
 
     this.undoStack = [];
     this.redoStack = [];
+
+    this.hitTolerance = 10;
+    this.hoverShape = null;
+
+    this._bindEvents();
+    this.resize();
+    this.draw();
+  }
+
+  _bindEvents() {
+    window.addEventListener("resize", () => this.resize());
+
+    this.canvas.addEventListener("mousedown", (e) => this.onMouseDown(e));
+    this.canvas.addEventListener("mousemove", (e) => this.onMouseMove(e));
+    this.canvas.addEventListener("mouseup", (e) => this.onMouseUp(e));
+    this.canvas.addEventListener("mouseleave", () => {
+      this.hoverShape = null;
+      this.draw();
+    });
+  }
+
+  resize() {
+    const rect = this.canvas.getBoundingClientRect();
+    this.canvas.width = rect.width;
+    this.canvas.height = rect.height;
+    this.draw();
   }
 
   setTool(tool) {
     this.tool = tool;
+    this.hoverShape = null;
+    this.isDrawing = false;
     this.currentPolyline = null;
-    this.currentCircle = null;
-  }
-
-  setShapes(shapes) {
-    this.shapes = shapes;
-  }
-
-  factoryFromJSON(o) {
-    if (!o || !o.type) return null;
-    if (o.type === "line") return new Line(o.id, o.x1, o.y1, o.x2, o.y2);
-    if (o.type === "polyline") return new Polyline(o.id, o.points);
-    if (o.type === "circle") return new Circle(o.id, o.cx, o.cy, o.r);
-    return null;
+    this.updateSelectionInfo();
   }
 
   pushUndo() {
@@ -49,172 +140,272 @@ export class Editor {
   }
 
   undo() {
-    if (this.undoStack.length === 0) return;
-    const state = this.undoStack.pop();
+    if (!this.undoStack.length) return;
     this.redoStack.push(JSON.stringify(this.shapes));
-    this.shapes = JSON.parse(state).map((o) => this.factoryFromJSON(o)).filter(Boolean);
-    this.selection = null;
+    this.shapes = JSON.parse(this.undoStack.pop());
+    this.draw();
   }
 
   redo() {
-    if (this.redoStack.length === 0) return;
-    const state = this.redoStack.pop();
+    if (!this.redoStack.length) return;
     this.undoStack.push(JSON.stringify(this.shapes));
-    this.shapes = JSON.parse(state).map((o) => this.factoryFromJSON(o)).filter(Boolean);
-    this.selection = null;
+    this.shapes = JSON.parse(this.redoStack.pop());
+    this.draw();
   }
 
-  worldFromScreen(sx, sy, canvas) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (sx - rect.left - this.view.offsetX) / this.view.scale;
-    const y = (sy - rect.top - this.view.offsetY) / this.view.scale;
-    return { x, y };
-  }
-
-  onMouseDown(e, canvas) {
-    const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
-
-    if (this.tool === "pan") {
-      this.panStart = {
-        sx: e.clientX,
-        sy: e.clientY,
-        ox: this.view.offsetX,
-        oy: this.view.offsetY,
-      };
-      return;
-    }
-
-    if (this.tool === "select") {
-      this.selection = this.pickShape(x, y);
-      if (this.selection) {
-        this.dragStart = {
-          sx: e.clientX,
-          sy: e.clientY,
-          orig: JSON.parse(JSON.stringify(this.selection.shape)),
-        };
-      }
-      return;
-    }
-
-    if (this.tool === "line") {
-      this.pushUndo();
-      const line = new Line(nextId++, x, y, x, y);
-      this.shapes.push(line);
-      this.selection = { shape: line };
-      this.dragStart = {
-        sx: e.clientX,
-        sy: e.clientY,
-        orig: JSON.parse(JSON.stringify(line)),
-      };
-      return;
-    }
-
-    if (this.tool === "polyline") {
-      if (!this.currentPolyline) {
-        this.pushUndo();
-        this.currentPolyline = new Polyline(nextId++, [x, y]);
-        this.shapes.push(this.currentPolyline);
-      } else {
-        this.currentPolyline.points.push(x, y);
-      }
-      this.selection = { shape: this.currentPolyline };
-      return;
-    }
-
-    if (this.tool === "circle") {
-      this.pushUndo();
-      this.currentCircle = new Circle(nextId++, x, y, 0);
-      this.shapes.push(this.currentCircle);
-      this.selection = { shape: this.currentCircle };
-      return;
-    }
-  }
-
-  onMouseMove(e, canvas) {
-    const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
-
-    if (this.tool === "pan" && this.panStart) {
-      const dx = e.clientX - this.panStart.sx;
-      const dy = e.clientY - this.panStart.sy;
-      this.view.offsetX = this.panStart.ox + dx;
-      this.view.offsetY = this.panStart.oy + dy;
-      return;
-    }
-
-    if (this.tool === "select" && this.dragStart && this.selection) {
-      const { x: x0, y: y0 } = this.worldFromScreen(
-        this.dragStart.sx,
-        this.dragStart.sy,
-        canvas
-      );
-      const dx = x - x0;
-      const dy = y - y0;
-      this.moveShape(this.selection.shape, this.dragStart.orig, dx, dy);
-      return;
-    }
-
-    if (this.tool === "line" && this.selection?.shape.type === "line") {
-      this.selection.shape.x2 = x;
-      this.selection.shape.y2 = y;
-      return;
-    }
-
-    if (this.tool === "circle" && this.currentCircle) {
-      const dx = x - this.currentCircle.cx;
-      const dy = y - this.currentCircle.cy;
-      this.currentCircle.r = Math.hypot(dx, dy);
-      return;
-    }
-  }
-
-  onMouseUp() {
-    this.dragStart = null;
-    this.panStart = null;
-    this.currentCircle = null;
-  }
-
-  onDoubleClick(e, canvas) {
-    if (this.tool === "polyline" && this.currentPolyline) {
-      const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
-      this.currentPolyline.points.push(x, y);
-      this.currentPolyline = null;
-    }
-  }
-
-  moveShape(shape, orig, dx, dy) {
-    if (shape.type === "line") {
-      shape.x1 = orig.x1 + dx;
-      shape.y1 = orig.y1 + dy;
-      shape.x2 = orig.x2 + dx;
-      shape.y2 = orig.y2 + dy;
-    } else if (shape.type === "polyline") {
-      for (let i = 0; i < shape.points.length; i += 2) {
-        shape.points[i] = orig.points[i] + dx;
-        shape.points[i + 1] = orig.points[i + 1] + dy;
-      }
-    } else if (shape.type === "circle") {
-      shape.cx = orig.cx + dx;
-      shape.cy = orig.cy + dy;
-    }
-  }
-
-  pickShape(x, y) {
+  pickShape(x, y, tol = 5) {
     for (let i = this.shapes.length - 1; i >= 0; i--) {
-      const s = this.shapes[i];
-      if (hitTestShape(s, x, y, 5 / this.view.scale)) {
-        return { shape: s };
+      if (this.shapes[i].hitTest(x, y, tol)) {
+        return { shape: this.shapes[i], index: i };
       }
     }
     return null;
   }
 
-  zoom(delta, cx, cy) {
-    const factor = delta > 0 ? 0.9 : 1.1;
-    const oldScale = this.view.scale;
-    const newScale = oldScale * factor;
-    this.view.offsetX = cx - (cx - this.view.offsetX) * (newScale / oldScale);
-    this.view.offsetY = cy - (cy - this.view.offsetY) * (newScale / oldScale);
-    this.view.scale = newScale;
+  canvasToWorld(x, y) {
+    return { x: x - this.offset.x, y: y - this.offset.y };
+  }
+
+  onMouseDown(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const world = this.canvasToWorld(x, y);
+
+    if (this.tool === "pan") {
+      this.isPanning = true;
+      this.panStart = { x: e.clientX, y: e.clientY, ox: this.offset.x, oy: this.offset.y };
+      return;
+    }
+
+    if (this.tool === "eraser") {
+      const hit = this.pickShape(world.x, world.y, this.hitTolerance);
+      if (hit) {
+        this.pushUndo();
+        this.shapes.splice(hit.index, 1);
+        this.hoverShape = null;
+        this.draw();
+      }
+      return;
+    }
+
+    if (this.tool === "select") {
+      const hit = this.pickShape(world.x, world.y, this.hitTolerance);
+      this.selection = hit ? hit.shape : null;
+      this.updateSelectionInfo();
+      this.draw();
+      return;
+    }
+
+    if (this.tool === "line") {
+      if (!this.isDrawing) {
+        this.isDrawing = true;
+        this.lastPoint = world;
+      } else {
+        this.pushUndo();
+        this.shapes.push(new Line([this.lastPoint, world]));
+        this.isDrawing = false;
+        this.lastPoint = null;
+        this.draw();
+      }
+      return;
+    }
+
+    if (this.tool === "polyline") {
+      if (!this.currentPolyline) {
+        this.currentPolyline = new Polyline([world]);
+        this.isDrawing = true;
+      } else {
+        this.currentPolyline.points.push(world);
+      }
+      this.draw();
+      return;
+    }
+
+    if (this.tool === "circle") {
+      if (!this.isDrawing) {
+        this.isDrawing = true;
+        this.lastPoint = world;
+      } else {
+        const r = Math.hypot(world.x - this.lastPoint.x, world.y - this.lastPoint.y);
+        this.pushUndo();
+        this.shapes.push(new Circle(this.lastPoint, r));
+        this.isDrawing = false;
+        this.lastPoint = null;
+        this.draw();
+      }
+      return;
+    }
+  }
+
+  onMouseMove(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const world = this.canvasToWorld(x, y);
+
+    if (this.isPanning && this.tool === "pan") {
+      const dx = e.clientX - this.panStart.x;
+      const dy = e.clientY - this.panStart.y;
+      this.offset.x = this.panStart.ox + dx;
+      this.offset.y = this.panStart.oy + dy;
+      this.draw();
+      return;
+    }
+
+    if (this.tool === "eraser") {
+      const hit = this.pickShape(world.x, world.y, this.hitTolerance);
+      this.hoverShape = hit ? hit.shape : null;
+      this.draw();
+      return;
+    }
+
+    if (this.tool === "polyline" && this.currentPolyline && this.isDrawing) {
+      const pts = [...this.currentPolyline.points, world];
+      this.draw();
+      this._drawTempPolyline(pts);
+      return;
+    }
+
+    if (this.tool === "line" && this.isDrawing && this.lastPoint) {
+      this.draw();
+      this._drawTempLine(this.lastPoint, world);
+      return;
+    }
+
+    if (this.tool === "circle" && this.isDrawing && this.lastPoint) {
+      this.draw();
+      const r = Math.hypot(world.x - this.lastPoint.x, world.y - this.lastPoint.y);
+      this._drawTempCircle(this.lastPoint, r);
+      return;
+    }
+  }
+
+  onMouseUp() {
+    if (this.isPanning) {
+      this.isPanning = false;
+    }
+  }
+
+  _drawTempLine(p1, p2) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(this.offset.x, this.offset.y);
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "#888";
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawTempPolyline(points) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(this.offset.x, this.offset.y);
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "#888";
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  _drawTempCircle(center, radius) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(this.offset.x, this.offset.y);
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "#888";
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  closePolyline() {
+    if (this.currentPolyline && this.currentPolyline.points.length > 2) {
+      this.pushUndo();
+      this.shapes.push(this.currentPolyline);
+    }
+    this.currentPolyline = null;
+    this.isDrawing = false;
+    this.draw();
+  }
+
+  handleAbsoluteCoordinate(x, y) {
+    const pt = { x, y };
+    if (this.tool === "line") {
+      if (!this.isDrawing) {
+        this.isDrawing = true;
+        this.lastPoint = pt;
+      } else {
+        this.pushUndo();
+        this.shapes.push(new Line([this.lastPoint, pt]));
+        this.isDrawing = false;
+        this.lastPoint = null;
+        this.draw();
+      }
+    } else if (this.tool === "polyline") {
+      if (!this.currentPolyline) {
+        this.currentPolyline = new Polyline([pt]);
+        this.isDrawing = true;
+      } else {
+        this.currentPolyline.points.push(pt);
+        this.draw();
+      }
+    } else if (this.tool === "circle") {
+      if (!this.isDrawing) {
+        this.isDrawing = true;
+        this.lastPoint = pt;
+      } else {
+        const r = Math.hypot(pt.x - this.lastPoint.x, pt.y - this.lastPoint.y);
+        this.pushUndo();
+        this.shapes.push(new Circle(this.lastPoint, r));
+        this.isDrawing = false;
+        this.lastPoint = null;
+        this.draw();
+      }
+    }
+  }
+
+  handleRelativeCoordinate(dx, dy) {
+    const base =
+      this.lastPoint ||
+      (this.currentPolyline && this.currentPolyline.points[this.currentPolyline.points.length - 1]);
+    if (!base) return;
+    const pt = { x: base.x + dx, y: base.y + dy };
+    this.handleAbsoluteCoordinate(pt.x, pt.y);
+  }
+
+  updateSelectionInfo() {
+    if (!this.selection) {
+      this.selectionInfoEl.textContent = "Ei valintaa";
+      return;
+    }
+    this.selectionInfoEl.textContent = this.selection.constructor.name;
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.translate(this.offset.x, this.offset.y);
+
+    for (const s of this.shapes) {
+      const highlight = this.tool === "eraser" && this.hoverShape === s;
+      s.draw(ctx, highlight);
+    }
+
+    if (this.currentPolyline) {
+      this.currentPolyline.draw(ctx);
+    }
+
+    ctx.restore();
   }
 }
-
