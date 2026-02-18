@@ -12,7 +12,7 @@ export function loadScene(factory) {
   if (!raw) return [];
   try {
     const arr = JSON.parse(raw);
-    return arr.map((o) => factory(o));
+    return arr.map((o) => factory(o)).filter(Boolean);
   } catch {
     return [];
   }

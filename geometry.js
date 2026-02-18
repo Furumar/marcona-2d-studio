@@ -68,7 +68,7 @@ export class Circle {
       minX: this.cx - this.r,
       minY: this.cy - this.r,
       maxX: this.cx + this.r,
-      maxY: this.cy + this.r
+      maxY: this.cy + this.r,
     };
   }
 

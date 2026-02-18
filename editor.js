@@ -35,6 +35,7 @@ export class Editor {
   }
 
   factoryFromJSON(o) {
+    if (!o || !o.type) return null;
     if (o.type === "line") return new Line(o.id, o.x1, o.y1, o.x2, o.y2);
     if (o.type === "polyline") return new Polyline(o.id, o.points);
     if (o.type === "circle") return new Circle(o.id, o.cx, o.cy, o.r);
@@ -50,7 +51,7 @@ export class Editor {
     if (this.undoStack.length === 0) return;
     const state = this.undoStack.pop();
     this.redoStack.push(JSON.stringify(this.shapes));
-    this.shapes = JSON.parse(state).map((o) => this.factoryFromJSON(o));
+    this.shapes = JSON.parse(state).map((o) => this.factoryFromJSON(o)).filter(Boolean);
     this.selection = null;
   }
 
@@ -58,7 +59,7 @@ export class Editor {
     if (this.redoStack.length === 0) return;
     const state = this.redoStack.pop();
     this.undoStack.push(JSON.stringify(this.shapes));
-    this.shapes = JSON.parse(state).map((o) => this.factoryFromJSON(o));
+    this.shapes = JSON.parse(state).map((o) => this.factoryFromJSON(o)).filter(Boolean);
     this.selection = null;
   }
 
@@ -73,7 +74,12 @@ export class Editor {
     const { x, y } = this.worldFromScreen(e.clientX, e.clientY, canvas);
 
     if (this.tool === "pan") {
-      this.panStart = { sx: e.clientX, sy: e.clientY, ox: this.view.offsetX, oy: this.view.offsetY };
+      this.panStart = {
+        sx: e.clientX,
+        sy: e.clientY,
+        ox: this.view.offsetX,
+        oy: this.view.offsetY,
+      };
       return;
     }
 
@@ -94,7 +100,11 @@ export class Editor {
       const line = new Line(nextId++, x, y, x, y);
       this.shapes.push(line);
       this.selection = { shape: line };
-      this.dragStart = { sx: e.clientX, sy: e.clientY, orig: JSON.parse(JSON.stringify(line)) };
+      this.dragStart = {
+        sx: e.clientX,
+        sy: e.clientY,
+        orig: JSON.parse(JSON.stringify(line)),
+      };
       return;
     }
 
@@ -114,6 +124,7 @@ export class Editor {
       this.pushUndo();
       this.currentCircle = new Circle(nextId++, x, y, 0);
       this.shapes.push(this.currentCircle);
+      this.selection = { shape: this.currentCircle };
       return;
     }
   }
@@ -130,7 +141,11 @@ export class Editor {
     }
 
     if (this.tool === "select" && this.dragStart && this.selection) {
-      const { x: x0, y: y0 } = this.worldFromScreen(this.dragStart.sx, this.dragStart.sy, canvas);
+      const { x: x0, y: y0 } = this.worldFromScreen(
+        this.dragStart.sx,
+        this.dragStart.sy,
+        canvas
+      );
       const dx = x - x0;
       const dy = y - y0;
       this.moveShape(this.selection.shape, this.dragStart.orig, dx, dy);
