@@ -1,0 +1,65 @@
+/* FILE: style.css */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #111;
+  color: #eee;
+}
+
+.toolbar button {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+}
+
+.toolbar button.active {
+  background: #3a7bd5;
+  border-color: #3a7bd5;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+#viewport {
+  flex: 1;
+  background: #181818;
+  display: block;
+}
+
+.sidebar {
+  width: 260px;
+  border-left: 1px solid #333;
+  background: #101010;
+  color: #ddd;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.sidebar pre {
+  background: #181818;
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow: auto;
+}
