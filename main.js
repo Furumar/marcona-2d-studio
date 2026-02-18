@@ -157,7 +157,113 @@ function updateSelectionInfo() {
     selectionInfo.textContent = "Ei valintaa";
     return;
   }
+
+  // === MARCONA Command Architecture v1 ===
+
+// Paneelin elementit
+const cmdPanel = document.getElementById("cmd-panel");
+const cmdInput = document.getElementById("cmd-input");
+const cmdHeader = document.getElementById("cmd-panel-header");
+
+// Paneelin näkyvyys
+function showCmdPanel() {
+  cmdPanel.classList.add("visible");
+  cmdInput.focus();
+}
+
+function hideCmdPanel() {
+  cmdPanel.classList.remove("visible");
+}
+
+// Aktivoi paneeli kun käyttäjä alkaa kirjoittaa
+window.addEventListener("keydown", (e) => {
+  // Älä avaa paneelia jos käyttäjä on tekstikentässä
+  if (document.activeElement === cmdInput) return;
+
+  // Avaa paneeli ja syötä ensimmäinen kirjain
+  showCmdPanel();
+  cmdInput.value = e.key.length === 1 ? e.key : "";
+});
+
+// ESC sulkee paneelin ja pyyhekumin
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    hideCmdPanel();
+    editor.setTool("select");
+  }
+});
+
+// Komennon suoritus
+cmdInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const cmd = cmdInput.value.trim();
+    cmdInput.value = "";
+    hideCmdPanel();
+    handleCommand(cmd);
+  }
+});
+
+// Komentojen käsittely
+function handleCommand(cmd) {
+  cmd = cmd.toLowerCase();
+
+  // Työkalukomennot
+  if (cmd === "line") return editor.setTool("line");
+  if (cmd === "polyline") return editor.setTool("polyline");
+  if (cmd === "circle") return editor.setTool("circle");
+  if (cmd === "pan") return editor.setTool("pan");
+  if (cmd === "select") return editor.setTool("select");
+
+  // Pyyhekumi
+  if (cmd === "e" || cmd === "erase") {
+    editor.setTool("eraser");
+    return;
+  }
+
+  // Undo/Redo
+  if (cmd === "u" || cmd === "undo") return editor.undo();
+  if (cmd === "r" || cmd === "redo") return editor.redo();
+
+  // Absoluuttiset koordinaatit
+  if (/^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(cmd)) {
+    const [x, y] = cmd.split(",").map(Number);
+    editor.handleAbsoluteCoordinate(x, y);
+    return;
+  }
+
+  // Suhteelliset koordinaatit
+  if (cmd.startsWith("@")) {
+    const rel = cmd.substring(1);
+    const [dx, dy] = rel.split(",").map(Number);
+    editor.handleRelativeCoordinate(dx, dy);
+    return;
+  }
+}
+
+// === Drag & Drop komentopaneelille ===
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let dragging = false;
+
+cmdHeader.addEventListener("mousedown", (e) => {
+  dragging = true;
+  dragOffsetX = e.clientX - cmdPanel.offsetLeft;
+  dragOffsetY = e.clientY - cmdPanel.offsetTop;
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  cmdPanel.style.left = `${e.clientX - dragOffsetX}px`;
+  cmdPanel.style.top = `${e.clientY - dragOffsetY}px`;
+  cmdPanel.style.transform = "none"; // poistaa keskityksen
+});
+
+window.addEventListener("mouseup", () => {
+  dragging = false;
+});
+
   selectionInfo.textContent = JSON.stringify(editor.selection.shape, null, 2);
 }
 
 draw();
+
