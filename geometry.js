@@ -27,7 +27,7 @@ export class Polyline {
   constructor(id, points = []) {
     this.type = "polyline";
     this.id = id;
-    this.points = points; // [x,y,x,y,...]
+    this.points = points;
   }
 
   get bbox() {
@@ -54,13 +54,33 @@ export class Polyline {
   }
 }
 
+export class Circle {
+  constructor(id, cx, cy, r) {
+    this.type = "circle";
+    this.id = id;
+    this.cx = cx;
+    this.cy = cy;
+    this.r = r;
+  }
+
+  get bbox() {
+    return {
+      minX: this.cx - this.r,
+      minY: this.cy - this.r,
+      maxX: this.cx + this.r,
+      maxY: this.cy + this.r
+    };
+  }
+
+  toJSON() {
+    return { ...this };
+  }
+}
+
 export function hitTestShape(shape, x, y, tol = 5) {
-  if (shape.type === "line") {
-    return hitTestLine(shape, x, y, tol);
-  }
-  if (shape.type === "polyline") {
-    return hitTestPolyline(shape, x, y, tol);
-  }
+  if (shape.type === "line") return hitTestLine(shape, x, y, tol);
+  if (shape.type === "polyline") return hitTestPolyline(shape, x, y, tol);
+  if (shape.type === "circle") return hitTestCircle(shape, x, y, tol);
   return false;
 }
 
@@ -85,4 +105,11 @@ function hitTestPolyline(poly, x, y, tol) {
     if (hitTestLine(seg, x, y, tol)) return true;
   }
   return false;
+}
+
+function hitTestCircle(circle, x, y, tol) {
+  const dx = x - circle.cx;
+  const dy = y - circle.cy;
+  const dist = Math.hypot(dx, dy);
+  return Math.abs(dist - circle.r) <= tol;
 }
